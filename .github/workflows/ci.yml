@@ -1,0 +1,46 @@
+name: Grub CI
+on: [push, pull_request]
+
+jobs:
+  builds_ubuntu_bionic:
+    name: Build with Ubuntu 18.04
+    runs-on: ubuntu-18.04
+    steps:
+      - uses: actions/checkout@v2
+      - name: depends
+        run: |
+          echo "deb-src http://archive.ubuntu.com/ubuntu bionic main" | sudo tee -a /etc/apt/sources.list
+          echo "deb-src http://archive.ubuntu.com/ubuntu bionic-updates main" | sudo tee -a /etc/apt/sources.list
+          sudo apt-get update
+          sudo apt-get build-dep --yes grub2 --assume-yes
+          sudo apt-get --quiet install --yes wget lsb-release fakeroot quilt
+      - name: build
+        run: |
+          apt-get source grub2
+          cd grub2-2.02/
+          (DEB_BUILD_OPTIONS=nocheck dpkg-buildpackage -b -uc -us) > build.log || { tail -n 50 build.log; exit 1; }
+          cd -
+          mkdir deb_pkgs
+          mv *.deb deb_pkgs
+      - name: artifacts_objs
+        uses: actions/upload-artifact@v1
+        if: failure()
+        with:
+          name: grub_objs
+          path: grub2-2.02/obj
+      - name: artifacts_debs
+        uses: actions/upload-artifact@v1
+        with:
+          name: grub_debs
+          path: deb_pkgs
+      - name: artifacts_images
+        uses: actions/upload-artifact@v1
+        with:
+          name: grub_images
+          path: grub2-2.02/debian/grub2-images/
+      - name: artifacts_logs
+        uses: actions/upload-artifact@v1
+        with:
+          name: grub_logs
+          path: grub2-2.02/build.log
+
